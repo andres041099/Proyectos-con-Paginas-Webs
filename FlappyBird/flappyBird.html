@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlappyBird</title>
+    <style>
+        canvas {
+            border: 1px solid gray;
+            display: block;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="mi-canvas" width="900" height="500"></canvas>
+    <label><input type="checkbox" name="" id="cbCuadricula"> <strong>Mostrar Cuadricula</strong></label>
+    <button id="btnIniciar">Iniciar</button>
+    <script>
+        let miCanvas = document.getElementById("mi-canvas");
+        let contexto = miCanvas.getContext("2d");
+
+        function actualizarFondo() {
+            contexto.save();
+            contexto.fillStyle = "skyblue";
+            contexto.fillRect(0, 0, miCanvas.width, miCanvas.height);
+            contexto.restore();
+        }
+
+        function dibujarCuadricula(separacion = 20) {
+            if (document.getElementById("cbCuadricula").checked) {
+                contexto.save();
+                for (let i = separacion; i < miCanvas.width; i += separacion) {
+                    contexto.beginPath();
+                    contexto.moveTo(i, 0);
+                    contexto.lineTo(i, miCanvas.height);
+                    contexto.textAlign = "center";
+                    contexto.fillText(i, i, separacion);
+                    contexto.stroke();
+                }
+
+                for (let i = separacion; i < miCanvas.height; i += separacion) {
+                    contexto.beginPath();
+                    contexto.moveTo(0, i);
+                    contexto.lineTo(miCanvas.width, i);
+                    contexto.textAlign = "center";
+                    contexto.fillText(i, separacion / 2, i);
+                    contexto.stroke();
+                }
+                contexto.restore();
+            }
+        }
+
+        let posicionTunelActual = miCanvas.width;
+        let pasadizos = [];
+        let puntuacion = 0;
+        let ave = crearAve();
+
+        for (let i = 0; i < 100; i++) {
+            let alturaPasadizo = 100 + Math.round(Math.random() * 150);
+            let yPasadizo = 50 + Math.round(Math.random() * (miCanvas.height - 50 - alturaPasadizo));
+            pasadizos.push(crearPasadizo(posicionTunelActual, yPasadizo, alturaPasadizo));
+            posicionTunelActual += 200 + Math.round(Math.random() * 150);
+        }
+
+        let intervalo = null;
+
+        actualizarFondo();
+        ave.dibujar();
+
+        document.getElementById("btnIniciar").addEventListener("click", function () {
+            if (intervalo == null) {
+                intervalo = setInterval(() => {
+                    actualizarFondo();
+                    dibujarCuadricula();
+                    puntuacion = 0;
+                    for (let i = 0; i < pasadizos.length; i++) {
+                        let pasadizoActual = pasadizos[i];
+                        pasadizoActual.dibujar();
+
+                        if (pasadizoActual.x + pasadizoActual.anchura < 0) {
+                            puntuacion++;
+                        }
+
+                        // Verificar colisión
+                        colision(ave, pasadizoActual);
+                        // Verificar si se ha alcanzado la puntuación para ganar
+                       if (puntuacion >= 100) {
+                           detenerJuego(`¡Ganaste! Puntos obtenidos: ${puntuacion}`);
+                       }
+                    }
+
+                    ave.caer();
+                    ave.dibujar();
+
+                    dibujarPuntuacion();
+
+                    
+                }, 10);
+            }
+        });
+
+        function dibujarPuntuacion() {
+            contexto.save();
+            contexto.fillStyle = "white";
+            contexto.font = "80px Comic Sans";
+            contexto.fillText(puntuacion, miCanvas.width / 2, miCanvas.height / 2);
+            contexto.restore();
+        }
+
+        function crearAve() {
+            return {
+                x: 120,
+                y: 200,
+                diametro: 40,
+                velocidadY: 0,
+                gravedad: 0.1,
+                estaAleteando: true,
+                subir() {
+                    this.velocidadY = -3; // Impulso hacia arriba
+                },
+                caer() {
+                    this.velocidadY += this.gravedad; // Gravedad lenta
+                    this.y += this.velocidadY;
+
+                    // Verificar si el ave cae al suelo
+                    if (this.y + this.diametro / 2 >= miCanvas.height) {
+                        this.y = miCanvas.height - this.diametro / 2;
+                        this.velocidadY = 0;
+                        detenerJuego(`Perdiste. Puntos obtenidos: ${puntuacion}`);
+                    }
+
+                    // Verificar si el ave se sale por arriba
+                    if (this.y - this.diametro / 2 <= 0) {
+                        this.y = this.diametro / 2;
+                        this.velocidadY = 0;
+                        detenerJuego(`Perdiste. Puntos obtenidos: ${puntuacion}`);
+                    }
+                },
+                dibujar() {
+                    this.estaAleteando = !this.estaAleteando;
+                    let radio = this.diametro / 2;
+                    contexto.save();
+                    contexto.translate(this.x, this.y);
+
+                    // cuerpo
+                    contexto.fillStyle = "yellow";
+                    contexto.beginPath();
+                    contexto.arc(0, 0, radio, 0, 2 * Math.PI);
+                    contexto.fill();
+                    contexto.stroke();
+
+                    // pico
+                    contexto.beginPath();
+                    contexto.fillStyle = "orange";
+                    contexto.ellipse(radio, radio / 3, radio / 2, radio / 4, 0, 0, Math.PI * 2);
+                    contexto.fill();
+
+                    // linea del pico
+                    contexto.beginPath();
+                    contexto.fillStyle = "gray";
+                    contexto.moveTo(10, 7);
+                    contexto.lineTo(30, 7);
+                    contexto.stroke();
+
+                    // ojo
+                    contexto.beginPath();
+                    contexto.fillStyle = "white";
+                    contexto.arc(radio / 2, -radio / 2, radio / 2, 0, Math.PI * 2);
+                    contexto.fill();
+                    contexto.stroke();
+
+                    // pupila
+                    contexto.beginPath();
+                    contexto.fillStyle = "black";
+                    contexto.arc(radio / 1.2, -radio / 3, radio / 4, 0, Math.PI * 2);
+                    contexto.fill();
+                    contexto.stroke();
+
+                    if (this.estaAleteando) {
+                        // ala al aletear
+                        contexto.beginPath();
+                        contexto.fillStyle = "white";
+                        contexto.ellipse(-radio / 2, 0, radio * .60, radio / 4, gradosARadianes(30), 0, Math.PI * 2);
+                        contexto.fill();
+                        contexto.stroke();
+                    } else {
+                        // ala normal
+                        contexto.beginPath();
+                        contexto.fillStyle = "white";
+                        contexto.ellipse(-radio / 2, radio / 6, radio * .60, radio / 4, 0, 0, Math.PI * 2);
+                        contexto.fill();
+                        contexto.stroke();
+                    }
+
+                    contexto.restore();
+                }
+            };
+        }
+
+        function crearPasadizo(x, y, altura) {
+            return {
+                x,
+                y,
+                altura,
+                anchura: 60,
+                dibujar() {
+                    let anchura = this.anchura;
+                    let altura = this.altura;
+                    contexto.save();
+                    let gradiente = contexto.createLinearGradient(this.x, 0, this.x + anchura, 0);
+                    gradiente.addColorStop(0, "green");
+                    gradiente.addColorStop(0.5, "lightgreen");
+                    gradiente.addColorStop(1, "green");
+
+                    // dibujar tunel superior
+                    contexto.fillStyle = gradiente;
+                    contexto.fillRect(this.x, 0, anchura, y);
+                    contexto.strokeRect(this.x, -5, anchura, y + 5);
+                    contexto.fillRect(this.x - 5, y - 20, anchura + 10, 20);
+                    contexto.strokeRect(this.x - 5, y - 20, anchura + 10, 20);
+
+                    // dibujar tunel inferior
+                    contexto.fillStyle = gradiente;
+                    contexto.fillRect(this.x, y + altura, anchura, miCanvas.height - (y + altura));
+                    contexto.strokeRect(this.x, y + altura, anchura, miCanvas.height - (y + altura));
+                    contexto.fillRect(this.x - 5, y + altura - 20, anchura + 10, 20);
+                    contexto.strokeRect(this.x - 5, y + altura - 20, anchura + 10, 20);
+
+                    contexto.restore();
+                    this.actualizar();
+                },
+                actualizar() {
+                    this.x--;
+                }
+            };
+        }
+
+        function gradosARadianes(grados) {
+            return grados * Math.PI / 180;
+        }
+
+        window.addEventListener("keydown", function(event){
+            if (event.key === 'w' || event.key === 'W') {
+                ave.subir();
+            }
+        });
+        function colision(ave, pasadizo) {
+    // Definir los límites del ave
+    let aveIzquierda = ave.x - ave.diametro / 2;
+    let aveDerecha = ave.x + ave.diametro / 2;
+    let aveArriba = ave.y - ave.diametro / 2;
+    let aveAbajo = ave.y + ave.diametro / 2;
+
+    // Definir los límites del túnel superior
+    let pasadizoIzquierda = pasadizo.x;
+    let pasadizoDerecha = pasadizo.x + pasadizo.anchura;
+    let pasadizoSuperior = 0; // La parte superior del canvas
+    let pasadizoInferior = pasadizo.y; // La parte inferior del túnel superior
+
+    // Verificar colisión con el túnel superior
+    let colisionConTúnelSuperior = aveDerecha > pasadizoIzquierda &&
+                                  aveIzquierda < pasadizoDerecha &&
+                                  aveArriba < pasadizoInferior;
+
+    // Definir los límites del túnel inferior
+    let pasadizoInferiorTúnelInferior = pasadizo.y + pasadizo.altura; // La parte inferior del túnel inferior
+
+    // Verificar colisión con el túnel inferior
+    let colisionConTúnelInferior = aveDerecha > pasadizoIzquierda &&
+                                  aveIzquierda < pasadizoDerecha &&
+                                  aveAbajo > pasadizoInferiorTúnelInferior;
+
+    // Verificar si colisiona con alguna de las partes del túnel
+    if (colisionConTúnelSuperior || colisionConTúnelInferior) {
+        detenerJuego("Perdiste. Puntos obtenidos: " + puntuacion);
+    }
+
+    // Retornar true si hay colisión con cualquier túnel
+    return colisionConTúnelSuperior || colisionConTúnelInferior;
+}
+        function detenerJuego(mensaje) {
+            clearInterval(intervalo);
+            alert(mensaje);
+            intervalo = null;
+        }
+    </script>
+</body>
+</html>
